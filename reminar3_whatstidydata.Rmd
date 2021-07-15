@@ -1,0 +1,307 @@
+---
+title: 'Reminar3: What is tidy data'
+author: "oskar"
+date: "7/12/2021"
+output:
+  html_document:
+    toc: yes
+    toc_float: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+
+# load packages
+library(tidyverse)
+
+```
+
+## Before we begin
+
+Last time we created github accounts and learned the basics of connecting Rstudio to Github. Let's be sure and continue to use that for our Reminars, as well as in any data projects you might be doing.
+
+Reminders:
+
+-   Open and close *projects* (not files) from the File Menu in Rstudio. Open the files you need from the file pane.
+
+-   You no longer need to set a working directory, but it can be very handy to use subdirectories like: data, scripts, output, images, etc.
+
+    -   e.g., if your project is setup correctly and you need to bring in a .csv file, you write something like: data = read.csv('data/mydata.csv') and that command will work on any computer provided the keep the folders organized the same way.
+
+-   At the end of this session be sure to commit and push your changes.
+
+## Main goals for today
+
+1)  be able to know what people mean when they say 'tidy data'
+
+2)  be familiar with the terms around the structure of tidy data
+
+3)  learn a couple tools to help you on the journey from messy to tidy
+
+## What is tidydata?
+
+A few weeks ago we got a brief introduction to the 'tidyverse' ([Tidyverse website](#https://www.tidyverse.org)).
+
+This term 'tidy' gets used a lot. Tidyverse, tidydata, tidy ... other stuff.
+
+What does it mean? In this case 'tidy' data is simply data that is ready for analysis. It has gone through a process of tidying (or wrangling) that gets it from messy to tidy. Tidy data sets are cleaned and have certain characteristics indicating that they have been properly ...tidyed.
+
+Note: I highly recommend reading [Hadley Wickham's article on tidy data](#https://cran.r-project.org/web/packages/tidyr/vignettes/tidy-data.html). A lot of the material in this tutorial is based on that article.
+
+The concept of tidy data brings with it a series of terms to help us talk about data and what they mean, both structure and content. Some of these terms are quite familiar to you; rows are the horizontal, side to side, lines of information in a dataset and columns are vertical, top to bottom.
+
+More importantly, *values* are the bits of information recorded in columns and rows.
+
+Every *value* should belong to a *variable* and an *observation*.
+
+*Variables* are conceptually distinct categories of measurement; a column of *values* that all measure the same attribute. There's no need to make this complicated - variables are things like height and weight and 'response to question 72' and sex and birthday and temperature.
+
+*Observations* are all the *values* measured on the same unit. Typical units are things like persons in an experiment, cities in the world for which you have the same measurements, or years for which you know how many people were born and how many died. I hope you can visualize a structure of what the dataframe for each of these looks like.
+
+We are developing a vocabulary for discussing how values are organized into rows and columns.
+
+Okay, now we can really define tidy data. You have tidy data when:
+
+-   *each column is a variable*
+
+-   *each row is an observation*
+
+-   *each cell contains one unique value*
+
+If these three criteria are not met, the data are *messy*.
+
+These criteria are extremely useful but you will find that in the organizing of data for different projects, some degree of judgment will still be warranted for determining variables; e.g., are height and weight separate columns or should there be a column for 'metric' and 'type'? We will develop some rules of thumb about this as we proceed -- -- but for the record, most of the time you will want height and weight as separate columns if your data are on individuals measured on one occasion. Perhaps if we were measuring house sizes we might have a column for 'dimension' that takes length and width, and one for 'size' which would have the recorded values in the same units of meters.
+
+Note further: there may be more than one way you want to structure your data, depending on purpose. Sometimes it is easier to display data in a 'messy' format, because of the needs of a client or for a particular slide in a talk. Sometimes you want to enter data into a spreadsheet using a 'messy' format and then convert it to tidy during processing.
+
+Your data must be 'tidy' for a regression analysis and I think it is useful to consider each column as a variable that you would pass to a regression.
+
+Sometimes you may be making a ggplot and will be using aesthetics and facets to display the data the way you want. The same techniques we use for getting data 'tidy' are useful for any re-arranging you need for a ggplot.
+
+To help navigate these decisions about data structure we are today focusing on *pivoting*, which we return to below. Pivoting lets you change the structure of your data so that you can convert a dataset from messy to tidy.
+
+Note, it is also useful to organize the order of columns with fixed variables first (on the left), then measured variables, and then computed variables.
+
+### Fake data example 1
+
+Let's look at a fake data example.
+
+```{r tidyfakedata}
+fd = data.frame(
+  id = c(1:10), 
+  height = rnorm(10, 150,10), 
+  weight = rnorm(10,120,10)) %>%
+  mutate(across(where(is.numeric),round,1))
+fd
+```
+
+The above gives us a dataframe with 3 columns and 10 rows. Each cell is a value. The first observation is the first row, which is on id number 1. We see that ID\#1 is `r fd[1,2]` in `r names(fd)[2]`.
+
+Is there any other way you might display the data?
+
+## Messy data: some basic types
+
+In the tidydata article linked to above, Hadley Wickham names five of the most common problems encountered with messy datasets. Let's consider the first three:
+
+> -   Column headers are values, not variable names.
+>
+> -   Multiple variables are stored in one column.
+>
+> -   Variables are stored in both rows and columns.
+
+We are even going to look at some of the same examples that Hadley uses in that article, but then we'll later look at some of our own.
+
+## Pivoting - a tool for changing data structure
+
+The ability to 'pivot' your data from wide to long and long to wide is a prominent tidyverse thing [^1]. Pivoting helps you align observations with rows and variables with columns.
+
+[^1]: What we now call 'pivot wide' and 'pivot long' replaced two earlier tidyverse verbs by different names, what are they? How might you find that within Rstudio?
+
+- "gather" and "spread"
+
+Look at this dataset, which gives the number of respondents at different income levels by religious affiliation, and define the values, columns, rows, variables, and observations:
+
+```{r exreligincome}
+head(relig_income) 
+```
+
+You can of course display more of the religion and income dataset by using `View()` or just typing the name of the dataset `relig_income` in your console.
+
+What do you think about how this is displayed?
+
+Look at the three types of messy data listed above. Does any of those apply here?
+
+Let's consider one alternative structuring of `relig_income` using a pivot:
+
+```{r egpivreliginc}
+relig_income %>% 
+  pivot_longer(., cols = -religion, names_to = "income", values_to = "count")
+```
+
+Compare these two depictions of the same data on religion and income. Let's make sure we understand:
+
+1.  what happened in the code
+
+2.  what the differences are in the two versions using our language of tidy data
+
+Probably, the code is new(-ish) to you so we should unpack it further. Here we have passed four arguments to pivot_longer - one is a data object given by the `.` because we are using a `%>%` and then three options. We tell it which columns to use in the pivoting: the `-religion` means every column but religion; the `names_to =` is the name of the column that will contain the categorical values, the names; and the `values_to =` is the name of the column that will contain the counts (numeric values).
+
+### types of messy
+
+That was an example of the first kind of messy data, 'Column headers are values, not variable names'.
+
+The second, 'Multiple variables are stored in one column' we will not consider in as much depth, but lets quickly go over the example of it that Hadley provides in his paper.
+
+*so we take a few minutes and just look at the example*
+
+Next we look at the third form of messy: Variables are stored in both rows and columns
+
+Look at this example of weather data and identify the values, observations, and variables.
+
+```{r egweather}
+weather = read.csv('data/weather_hadley.csv')
+head(weather)
+
+```
+
+Is it clear in the above what's going on?
+
+Variables are id, year, month, day, tmin, and tmax. So... id, year, and month are columns, but the values of day are spread across columns, and the t max and tmin are combined in a column.
+
+Let's try this (thanks Hadley!):
+
+```{r weathertidyer}
+weather_t1 <- weather %>% 
+  pivot_longer(
+    d1:d31,  # the column in the pivot 
+    names_to = "day", 
+    values_to = "value", 
+    values_drop_na = TRUE # optional, but gets rid of some of the missing cases. 
+  ) %>%
+  mutate(day = as.integer(gsub("d", "", day))) %>% # further cleans the day column
+  select(id, year, month, day, element, value) # rearrange the column order 
+
+head(weather_t1)
+
+```
+
+Is the above tidy?
+
+If we think that tmin and tmax are different variables, it would be necessary to have them in different columns:
+
+```{r tidyweather}
+
+weather_t2 = weather_t1 %>% 
+  pivot_wider(names_from = element, values_from = value)
+head(weather_t2)
+```
+
+Take another look back at the previous two code chunks. Is it clear that we are using `pivot_longer ()` to go from horizontal to vertical (long because we are adding rows) and `pivot_wider()` to go from vertical to horizontal (hence, wider bc we are adding columns)?
+
+## Practice: A recent example from the lab
+
+```{r irrexampledata}
+irrdata = readRDS('data/preirrReminardemo.rds')
+```
+
+We have this dataset comparing two raters of the same video-tapped tasks. Both raters code behaviors and apply time stamps using the coding software Boris. This kind of thing is fairly common in Psychology. At the end of the day we want to see how similar the two raters are and identify discrepancies for training purposes.
+
+Examine the data and get a general sense for it. Try things like `view(irrdata)` and `glimpse(irrdata)` .
+
+Okay, a disclaimer: this is pretty much actual code. I quickly simplified a couple things for this reminar (and hopefully didn't introduce mistakes in doing so). It is by no means perfect but it conveys an authentic situation. A good deal of the cleaning and wrangling code involved is not shown.
+
+```{r irrcleaned}
+irr_dur = irrdata %>%
+  select(coder_id, PID, `Behavioral category`, Start_s, Stop_s, Duration_s) %>% # grab the relevant columns
+  group_by(coder_id, PID, `Behavioral category`) %>% 
+mutate(
+  obsids = seq_along(Start_s)) %>% # this we ended up not using! but i'm keeping it here so you can see the experiment.
+  ungroup() %>%
+mutate(
+  coder_id = str_replace_all(coder_id, c("Juliette" = "j", "Morgan" = "m")),
+         #behavecode = paste(`Behavioral category`,obsids,sep = "_")
+         ) %>%
+  mutate(
+    Duration_s = as.numeric(Duration_s)) %>%
+  group_by(coder_id, PID, `Behavioral category`) %>%
+  summarize(timesum = sum(Duration_s, na.rm = T))
+# the above code contains an artifact of an earlier decision about how to compare data for the two coders. 
+
+irr_dur2 = 
+  full_join(irr_dur %>% 
+              filter(coder_id == 'j'), irr_dur %>% 
+              filter(coder_id == 'm'), by = c('PID','Behavioral category')) %>%
+  select(PID, Behavior = `Behavioral category`, j_totaltime = timesum.x, m_totaltime = timesum.y) %>%
+  mutate(timediff = j_totaltime - m_totaltime) %>%
+  arrange(timediff)
+            
+
+```
+
+Examine the code block above. It is a bit 'raw' and not even fully vetted, but i think doing the forensics on what the code does could be a useful exercise.
+
+## Practice: fake data examples for pivoting with ambiguity
+
+We will generate some fake data and pivot longer and wider for practice. Please make up your own wacky and zany pivot ideas.
+
+Here we are seeing that pivoting helps to reformat data in a fast and efficient way. We will use pivoting for purposes other than getting from messy to tidy. Perhaps you need to format a dataset to make it easy for RAs to enter something on a weekly basis, or perhaps you need to make data 'extra long' in order to use facets in ggplot for a descriptive purposes.
+
+Some of the column (and maybe variable?) names are open to interpretation - like survey and treatment. Are they variables or classification values for another variable? You can consider various possibilities and how each interpretation affects what is tidy or messy.
+
+Examine this dataset, what's happening? You won't really know exactly what the columns mean, but what are some plausible ideas?
+
+```{r fakedata2}
+set.seed(2021)
+fake2 = data.frame(
+  ID = rep(sample(1000:10000, 50),2), # a fake individual ID number
+  survey = c(rep(1,50),rep(2,50)),
+  treatment = sample(c("A","B","C"), 100, replace=T),
+  score = rnorm(100, mean=50, sd=20), # 100 normally distributed random numbers with a mean of 50 and sd of 20
+  event = c(1:100)) %>%
+  mutate(
+  amt = case_when(
+  treatment == 'A' ~ 4.5 + .1*(event + rnorm(100,mean=0,sd=40)),
+  treatment == 'B' ~ 1.75+.1*(event + rnorm(100,mean=0, sd=30)),
+  treatment == 'C' ~ 6.75-.09*(event + rnorm(100, mean=0, sd=35))
+    ),
+  #survey = sample(c(0,1),length(.$score),replace=TRUE),
+        across(where(is.character),as.factor),
+        mutate(across(where(is.numeric),round,2))) %>% arrange(ID)
+head(fake2)
+```
+
+We might want to consider score, event, and amt as different types of information where the type of information is itself a variable. To see the data this way, let's pivot longer.
+
+```{r fakelonger}
+fake3 = pivot_longer(fake2, cols = c(score, amt), names_to = 'variable', values_to = 'value')
+head(fake3)
+
+```
+
+One time of making it wider:
+
+```{r}
+fake4 = pivot_wider(fake2, id_cols = c(-score), names_from = survey, values_from = score, names_prefix = 'survey_')
+head(fake4)
+
+```
+
+Do something similar but lets break out treatment into different columns.
+
+```{r}
+fake5 = pivot_wider(fake2, id_cols = c(-treatment), names_from = treatment, values_from = score, names_prefix = 'treatment_')
+head(fake5)
+```
+
+```{r}
+ggplot(fake2, aes(x=amt, y=score, color = treatment))+
+  geom_point() + facet_wrap(.~ survey)
+```
+
+Redo the graph above but make survey the color and treatment the facet.
+
+```{r, practice graph}
+#ggplot(fake2, aes(x=amt, y=score, color = treatment))+
+ # geom_point() + facet_wrap(color ~ treatment)
+
+```
