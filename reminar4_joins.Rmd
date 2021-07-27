@@ -1,0 +1,309 @@
+---
+title: 'Reminar4: joins'
+author: "oskar"
+date: "7/26/2021"
+output:
+  bookdown::html_document2:
+    toc: yes
+    toc_float: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+
+# load packages
+library(tidyverse)
+
+```
+
+# Before we begin
+
+1.  Be sure and open your Reminar project and get your files in the appropriate folder.
+
+2.  Last time we covered tidy data and some tools to help get data from messy to tidy. Keep those tools in mind.
+
+3.  Don't forget to commit and push your changes to github at the end of the meeting.
+
+# Main goals for today
+
+1)  get a general understanding of 'relational data'
+
+2)  learn the basics of 'joining'
+
+3)  look at joining example
+
+# Overview
+
+'Joining' is how we connect one data table to another, provided they share a common variable called a 'key' (you can often make keys if they aren't there already). There are two main types of joins, mutating joins and filtering joins. Mutating joins add columns to a table. Filtering joins focus on changing the rows (finding matches or mismatches). There are a few kinds of each of these. Most of the time you will probably want to use a `left_join` - that is likely what one initially visualizes when thinking of a join.
+
+# What is relational data?
+
+When multiple tables of data relate to each other, they are relational. (\<- you read that correctly)
+
+'Relational' is simply a general term to refer to the two tables of data you might want to link together and/or cross-reference within a given project.
+
+The relations always occur between two tables, which must share some common variable that can be used as an index or a *key*. But you can have many pairs of tables in a system of relational data (students and schools, schools and districts, schools and teachers, teachers and students, districts and states, students and special programs, teachers and special programs, grades and teachers, grades and schools, etc.)
+
+The tidyverse has tools to help us work with pairs of tables. One in particular is called a 'join'. With joins we link to relational table tables together to form a new 'joined' table.
+
+## Mutating joins
+
+In mutating joins you are have two tables and you want to add variables from one to the other, making a new table with variables from both. We say 'mutating' because the focus is on adding variables (columns).
+
+In the tidyverse there are four types of mutating joins: inner, full, left, and right.
+
+First lets look at this conceptual image, taken from Hadley's book 'R for Data Science'[^1], then we'll review each one with fake data.
+
+[^1]: <https://r4ds.had.co.nz/index.html>
+
+![](images/join-venn.png){width="80%"}
+
+The shaded region represents which tables that will be kept after the join. An `inner_join` keeps only those observations that are in both x and y; a `left_join` keeps all rows from x, a `full_join` keeps all rows from both x and y; and a `right_join` keeps all rows from y. Most of the time you probably want a `left_join` - if you are unsure, i would start with that one.
+
+Okay, lets make some simple examples:
+
+```{r}
+tableX = data.frame(key = c(1,1,3,4,5,5,NA), var1 = letters[1:7], var2 = round(runif(7),2))
+tableY = data.frame(key = c(1,2,2,4,4,NA,6), var3 = LETTERS[1:7], var4 = round(runif(7),2))
+cbind(tableX, tableY) # the cbind is for display only 
+```
+
+(note above how using `cbind` is certainly not the outcome you'd want if you wanted to join these two tables)
+
+We will run through these quickly. The idea is to notice what happens to the matches and mismatches in our key column.
+
+Unlike the Figure above, lets start with a `left_join` because I think you'll use that the most:
+
+```{r leftjoinex}
+Z = left_join(tableX, tableY, by = 'key')
+Z
+```
+
+Which rows from the original two tables are present in Z? Does it make sense? Are you happy with how the NA was treated?
+
+The default is to treat the `NA` values as if they were matching keys. But if the data are missing for different reasons in each dataset, then you won't want to do this.
+
+```{r leftjoinNAoutex}
+Z2 = left_join(tableX, tableY, by = 'key', na_matches = 'never') #doesn't treat NA as a key - treats NAs on right as non-matches
+Z2
+```
+
+Make sure you understand the difference between Z and Z2. Is it clear what is happening when we set na_matches to 'never'?
+
+...
+
+Okay now lets look at a `full_join`
+
+```{r fulljoinex}
+Z = full_join(tableX, tableY, by = 'key')
+Z
+```
+
+As you can see, we have kept all of the rows from both tables. Note that unmatched rows in tableY are at the bottom, this is why we see key 2 at the tail end of the table. (you may want to try this with na_matches = 'never' like we did above on `left_join`)
+
+Okay now lets look at a `inner_join`
+
+```{r innerjoinex}
+Z = inner_join(tableX, tableY, by = 'key')
+Z
+```
+
+As you can see, we get fewer rows here, because it is only those keys present in both X and Y.
+
+Okay now lets look at a `right_join`
+
+```{r rightjoinex}
+Z = right_join(tableX, tableY, by = 'key')
+Z
+```
+
+## Filtering joins
+
+Filtering joins are focused on the observations rather than the variables. You might use them if you want to match a summary table back to some variables in the original data. I would guess you will use these less often than the mutating joins but it is good to be familiar with them.
+
+If we apply the two kinds of filtering join to our two tables we get:
+
+```{r semijoin}
+Z = semi_join(tableX, tableY, by = 'key')
+Z
+```
+
+Note this is where we see the 'filtering' behavior. Only the left side, TableX, columns are retained. The rows are those in Table X that have a match in TableY.
+
+And in an `anti_join`:
+
+```{r antijoin}
+Z = anti_join(tableX, tableY, by = 'key')
+Z
+```
+
+Again only the left side variables are retained: the rows are those that DO NOT have a match in TableY.
+
+This could be useful for finding which participants didn't do a second wave of a study, or if you had two versions of a data entry template and weren't sure if one had more data entered into it. In short, `anti_join` can be useful for finding mismatches between two tables. Note however that there are other functions for this like `setdiff`, `union`, and `intersect`.
+
+Lastly, lets cover duplicate variable names. Tidyverse wants each variable to have a unique name (remember, its an opinionated approach!). Often when you join tables there will be multiple common elements, such as day, year, or score or location.
+
+Let's alter the example from above to see how this works:
+
+```{r duplicatevarnames}
+# pretend that we'd set tableX and tableY up with the same column names.
+tableY = tableY %>% rename(var1 = var3, var2 = var4)
+head(tableY)
+
+```
+
+So lets do the same thing we've been doing and run a `left_join` on this now that the variables in each table have the same name:
+
+```{r}
+Z = left_join(tableX, tableY, by = 'key')
+Z
+```
+
+The function automatically renamed each variable with suffixes of .x and .y, so you could be sure and identify which parent table each column came from.
+
+Note, you can set this suffix to other values if you'd like:
+
+```{r}
+Z = left_join(tableX, tableY, by = 'key', suffix = c('_this','_that'), na_matches = 'never')
+Z
+```
+
+## A mental checklist to prepare for joins (and other manipulations)
+
+-   where are there missing values? Are any in the 'keys' for a table?
+
+-   Are the keys really unique? Perhaps there are duplicate keys by design or perhaps you made-up a key and it didn't quite work.
+
+-   make sure the keys for each table are of the same class (character, numeric, etc.)
+
+-   clean each table before joining them: Any shared columns are of same class; variable names cleaned and checked, all variables are of same class, etc.
+
+# Some random tips
+
+-   You can make up keys on the fly to create unique identifiers in each table. For example, lets say you have date in two datasets, separated out by month, day, and year, and also RAs who were making observations on each of the dates that your project did research. It may be that a unique key could be made by combining these variables, e.g., `paste(year, month, day, RA)`. If such an aggregation isn't sufficient, sometimes using a simple sequential number or a rownumber can work. But if you are joining two tables using a row number as a key, be sure to check any issues with grouping and sorting in each table before you create the key.
+
+-   To join by multiple variables, use a vector with length > 1. For example, by = c("a", "b") will match x$a to y$a and x$b to y$b. Use a named vector to match different variables in x and y. For example, by = c("a" = "b", "c" = "d") will match x$a to y$b and x$c to y$d.
+
+-   You will likely make some mistakes in your initial attempts to join and/or pivot tables of data. Here are some ways to identify where things went wrong:
+
+    -   use `dim()` on each dataset, before and after the manipulation. This just gives you the number of rows and columns, but this can be very informative. Most of the time you are doing something where the rows should stay the same and the columns should go up. Or the row number in the new data table is meant to be the sum of the two you combined. Typically if the join (or pivot) didn't happen the way you wanted, there will be a very noticeable error in the dimensions (dim). So this is a good way to spot obvious errors.
+
+    -   use `table()` - if `dim()` is too 'macro' to help you sleuth the problem, sometimes making a table of how many times two categorical variables co-occur can be useful. If you combine two datasets with factor variables then this can make sure that all the factors are represented after your join, or that one of them isn't suddenly way over-represented, or it can find spelling or capitalization missmatches, and the like.
+
+        -   so things like `table(mtcars %>% select(cyl, gear), useNA = 'always')` can be a really useful check.
+
+        -   in this rather specialized example (which won't run bc we don't have the 'raw' data), I am finding all occurrences of food descriptions that contain 'okra'. I had to do this many times to find slight variations on similar food items but this was a useful quick check: `rawfooditemdata_m %>% filter(grepl('Okra',value, ignore.case = TRUE)) %>% select(value) %>% table(., useNA = 'always')`
+
+-   sometimes the mistake you made comes from a misunderstanding about duplicated rows. Either you didn't realize you had duplicates or you introduced them by mistake during a join. Here's a function to help you find duplicates:
+
+```{r duplicatesfunction}
+which_duplicated <- function(dat){
+    which(duplicated(dat) | duplicated(dat[nrow(dat):1, ])[nrow(dat):1])
+}
+# lets take mtcars and repeat the first three rows at the bottom 
+carsduped = bind_rows(mtcars,mtcars[1:3,])
+which_duplicated(carsduped)
+# I specifically wanted both occurrences of the duplicate, not just the second.
+```
+
+The above code returns the row numbers that contain the duplicates.
+
+If you wanted to view a table of data showing the duplicates you could do this:
+
+```{r duplicatesfunction_view}
+# or to view the duplicated records: 
+View(carsduped[which_duplicated(carsduped),])
+```
+
+-   be especially cautious of duplicated 'keys'. Typically at least one of the tables you are joining should not have duplicates in the key column. If you are joining two tables together and both have duplicated keys, then you may get a lot of additional rows because all matches will be kept. You just have to be sure the duplicated keys are warranted. You might be linking each run of an experiment on a participant to their demographics. The PID should occur once in the demographics but maybe many times in the experiment data. Make sure the meaning of the key within each table is clear to you before doing the join.
+
+-   this is a handy resource for visualizing joins and also some set operations that we didn't cover: <https://github.com/gadenbuie/tidyexplain>
+
+# Actual example 1: a complex and kinda messy join about food
+
+In Project RISE we have a system on the questionnaires that asks people the source of information on various topics ('who' questions) and the reason for why they did or didn't do a thing ('why' questions).
+
+In one instance looking at these data we wanted to link the who and the why in a table. I had not previously setup my code to do this, and here's a little snapshot of the final step in the process for linking the 'who' and 'why' together. I had to invent a 'key' using the observation that the original survey had a consistent column numbering system.
+
+Working with a partner, look over the two tables, whodata and whydata, and then their joined product (use view, head, glimpse, etc). Make your best guesses about what might have happened, or what the goal was.
+
+```{r}
+whodata = readRDS('data/rawwho.rds')
+whydata = readRDS('data/rawwhy.rds')
+
+whowhyjoin = full_join(whydata %>% filter(value ==1), whodata %>% filter(value ==1), by = 'matchkey2') 
+
+```
+
+We'll talk about the above join.
+
+# Actual example 2: a fairly typical case of took it apart and put it back together
+
+Also in Project RISE we calculated a wealth metric that involved calculations across several columns of data. After the calculation we needed to 'join' the wealth index back to the main dataset.
+
+```{r ex1data}
+# mdf is like the main dataset; it has lots of variables recorded by participant 
+mdf = readRDS('data/mdfrem.rds') %>% select(id:wealthindex,ageclass:m_educat)
+# cwealthdf contains the result of the wealth calculations 
+cwealthdf = readRDS('data/cwealthrem.rds')
+
+```
+
+Here's the join:
+
+```{r}
+mdfjoin = left_join(mdf, cwealthdf %>% select(`@_id`, Sample, myPC1, myquant), by = c('id'= '@_id'))
+```
+
+Examine mdfjoin - is it clear what happened? Why is there a `select` inside the left_join? What is happening in the syntax with 'by = '?
+
+# Actual example 3: Revisiting the IRR example from last week, which is also a take it apart and put it back together type thing
+
+Lastly, we revisit the IRR example from last week because one might have been tempted to pivot_wider but in this case a divide and join seemed more straight forward. Sometimes we might not see a `join` problem as a `join` problem right away.
+
+```{r irrexampledata}
+irrdata = readRDS('data/preirrReminardemo.rds')
+```
+
+Okay, for review:
+
+We have this dataset comparing two raters of the same video-tapped tasks. Both raters code behaviors and apply time stamps using the coding software Boris. At the end of the day we want to see how similar the two raters are and identify discrepancies for training purposes.
+
+Work through this step-by-step:
+
+```{r irrcleaned}
+irr_dur = irrdata %>%
+  select(coder_id, PID, `Behavioral category`, Start_s, Stop_s, Duration_s) %>% # grab the relevant columns
+  group_by(coder_id, PID, `Behavioral category`) %>% 
+mutate(
+  obsids = seq_along(Start_s)) %>% # this we ended up not using! but i'm keeping it here so you can see the experiment.
+  ungroup() %>%
+mutate(
+  coder_id = str_replace_all(coder_id, c("Juliette" = "j", "Morgan" = "m")),
+         #behavecode = paste(`Behavioral category`,obsids,sep = "_")
+         ) %>%
+  mutate(
+    Duration_s = as.numeric(Duration_s)) %>%
+  group_by(coder_id, PID, `Behavioral category`) %>%
+  summarize(timesum = sum(Duration_s, na.rm = T))
+# the above code contains an example of how one can create an artificial key, but in this case the key was not useful. Look at how group_by and obsids work together. Do you get whats happening?  
+
+# note that we are using a join as a tool to seemingly pivot_wider(), but in this case we see the problem as one of having two related tables stacked on top of each other.  
+irr_dur2 = 
+  full_join(irr_dur %>% 
+              filter(coder_id == 'j'), irr_dur %>% 
+              filter(coder_id == 'm'), by = c('PID','Behavioral category')) %>%
+  select(PID, Behavior = `Behavioral category`, j_totaltime = timesum.x, m_totaltime = timesum.y) %>%
+  mutate(timediff = j_totaltime - m_totaltime) %>%
+  arrange(timediff)
+            
+
+```
+
+In the above, where does the code take a table and temporarily split it into two relational tables? Where in the above code could the option 'suffix' have been used?
+
+That's all for today.
+
+Questions?
+
+Please be sure to review these again on your own time so some of it sticks. Please ask more questions.
